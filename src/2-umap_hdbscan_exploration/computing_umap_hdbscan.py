@@ -8,19 +8,6 @@ import pandas as pd
 from tqdm import tqdm
 from umap import UMAP
 
-language = "english"
-model_used = "qwen06b"
-language_short = language[:2]
-UMAP_n_neighbors = 40
-HDBSCAN_min_cluster_size = 10
-HDBSCAN_min_samples = 10
-
-UMAP_n_neighbors_list = [15, 30, 45, 60]
-HDBSCAN_min_cluster_size_list = [5, 10, 20]
-HDBSCAN_min_samples_list = [5, 10, 20]
-index = 0
-record = {}
-
 
 def log(text):
     time = pd.Timestamp.now()
@@ -28,10 +15,16 @@ def log(text):
         file.write(f"[LOG] {time.strftime('%Y-%m-%d %X')} -- {text}\n")
 
 
+UMAP_n_neighbors_list = [15, 30, 45, 60]
+HDBSCAN_min_cluster_size_list = [5, 10, 20]
+HDBSCAN_min_samples_list = [5, 10, 20]
 models = {
     "fr": ["alibaba", "camembertav2", "qwen06b"],
     "en": ["alibaba", "f2llm", "qwen06b"],
 }
+
+index = 0
+record = []
 for language_short in ["fr", "en"]:
     for model_used in models[language_short]:
         log("#" * 50)
@@ -49,16 +42,18 @@ for language_short in ["fr", "en"]:
                 HDBSCAN_min_samples_list,
             )
         ):
-            record[index] = {
-                "language": language,
-                "model": model_used,
-                "n_neighbors": n_neighbors,
-                "min_cluster_size": min_cluster_size,
-                "min_sample": min_sample,
-            }
+            record.append(
+                {
+                    "index": index,
+                    "model": model_used,
+                    "n_neighbors": n_neighbors,
+                    "min_cluster_size": min_cluster_size,
+                    "min_sample": min_sample,
+                }
+            )
             log(
-                f"neighbor: {n_neighbors} | cluster size: {min_cluster_size} | min sample: {min_sample}"
-                + "#" * 20
+                f"neighbor: {n_neighbors} | cluster size: {min_cluster_size} | "
+                f"min sample: {min_sample}" + "#" * 20
             )
 
             umap_model = UMAP(
@@ -88,5 +83,7 @@ for language_short in ["fr", "en"]:
             df.to_csv(f"./umap_hdbscan_results/results-{index}.csv", index=False)
             index += 1
 
-with open("./umap_hdbscan_results/record.json", "w") as file:
-    json.dump(record, file, indent=2)
+            if index == 3:
+                break
+
+pd.DataFrame("./results-umap-hdbscan/record.csv", index=False)
