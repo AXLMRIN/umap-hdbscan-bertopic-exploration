@@ -1,6 +1,7 @@
 *.csv
-data/
-embeddings/
+data/*
+!data/README.md
+embeddings/*
 !embeddings/README.md
 **/logs.txt
 **/*temp*
