@@ -11,7 +11,7 @@ from umap import UMAP
 
 def log(text):
     time = pd.Timestamp.now()
-    with open("./src/logs.txt", "a") as file:
+    with open("./src/2-umap_hdbscan_exploration/logs.txt", "a") as file:
         file.write(f"[LOG] {time.strftime('%Y-%m-%d %X')} -- {text}\n")
 
 
@@ -45,6 +45,7 @@ for language_short in ["fr", "en"]:
             record.append(
                 {
                     "index": index,
+                    "language" : language_short,
                     "model": model_used,
                     "n_neighbors": n_neighbors,
                     "min_cluster_size": min_cluster_size,
@@ -80,10 +81,7 @@ for language_short in ["fr", "en"]:
                 }
             )
 
-            df.to_csv(f"./umap_hdbscan_results/results-{index}.csv", index=False)
+            df.to_csv(f"./results-umap-hdbscan/results-{index}.csv", index=False)
             index += 1
 
-            if index == 3:
-                break
-
-pd.DataFrame("./results-umap-hdbscan/record.csv", index=False)
+pd.DataFrame(record).to_csv("./results-umap-hdbscan/record.csv", index=False)
