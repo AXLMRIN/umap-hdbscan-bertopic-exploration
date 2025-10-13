@@ -24,7 +24,9 @@ import numpy as np
 from sklearn.metrics import silhouette_samples
 from sklearn.neighbors import KDTree
 
-from src.Evaluation.dcdistances.dctree import DCTree
+# AXLMRIN : line modification to adapt to my file structure
+# from src.Evaluation.dcdistances.dctree import DCTree 
+from dctree import DCTree
 
 
 def disco_score(X: np.ndarray, labels: np.ndarray, min_points: int = 5) -> float:
