@@ -4,4 +4,4 @@ data/*
 embeddings/*
 !embeddings/README.md
 **/logs.txt
-**/*temp*
+**/temp-*
