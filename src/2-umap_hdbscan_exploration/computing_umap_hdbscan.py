@@ -1,5 +1,3 @@
-import json
-
 from datasets import load_from_disk
 from hdbscan import HDBSCAN
 from itertools import product
