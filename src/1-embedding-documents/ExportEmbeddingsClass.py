@@ -32,9 +32,11 @@ class ExportEmbeddings:
             self.device = "cuda" if cuda_available() else "cpu"
         else:
             self.device = device
-        self.__model = AutoModelForSequenceClassification.from_pretrained(
-            model_name
-        ).to(device=self.device)
+        self.__model = (
+            AutoModelForSequenceClassification
+            .from_pretrained(model_name, trust_remote_code = True)
+            .to(device=self.device)
+        )
 
     def __get_embeddings(self, batch_size: int, additional_tags: list[str]) -> Tensor:
         with no_grad():
