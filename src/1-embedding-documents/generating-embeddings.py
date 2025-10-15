@@ -3,17 +3,19 @@ import pandas as pd
 from transformers import AutoConfig
 from sentence_transformers import SentenceTransformer
 from torch.cuda import is_available as cuda_available
+from tqdm import tqdm 
 
 from ExportEmbeddingsClass import clean
 
 language = "fr"
 ideal_context_window = 1500
+batch_size = 8
 # ==============================================================================
 df = pd.read_csv("./data/theses-to-embed.csv").sample(frac = 1)
 text_col = f"resumes.{language}"
 # model_name = "Qwen/Qwen3-Embedding-0.6B" # multilingual 
-# model_name = "sentence-transformers/all-MiniLM-L6-v2"  # multilingual
-model_name = "Alibaba-NLP/gte-multilingual-base" # multilingual 
+model_name = "sentence-transformers/all-MiniLM-L6-v2"  # multilingual
+# model_name = "Alibaba-NLP/gte-multilingual-base" # multilingual 
 # model_name = "codefuse-ai/F2LLM-0.6B" # english 
 # model_name = "Sahajtomar/french_semantic" # french
 # model_name = "camembert/camembert-base" # fr
@@ -31,17 +33,17 @@ tags = [
     "topics.fr",
 ]
 
-for col in tags: df[col] = df[col].astype(str)
+for col in tags: 
+    df[col] = df[col].astype(str)
 
 ds = Dataset.from_pandas(df.loc[:,tags])
 
 # ==============================================================================
 
-ds = ds.select(range(10))
+# ds = ds.select(range(10))
 
 # ==============================================================================
 device = "cuda" if cuda_available() else "cpu"
-print(f"Device : {device}")
 sbert_model = SentenceTransformer(
     model_name, 
     device = device, 
@@ -55,26 +57,30 @@ sbert_model.max_seq_length = min(
     ),
     ideal_context_window
 )
+
+print("+===============================+")
+print(f"Device : {device}")
 print(f"Context window : {sbert_model.max_seq_length}")
+print("+===============================+")
 
 try : 
-    embeddings = (
-        sbert_model
-        .encode(
-            ds["resumes.fr"], 
-            device=str(device), 
-            normalize_embeddings=True, 
-            show_progress_bar=True
+    embeddings = []
+    for batch in tqdm(ds.batch(batch_size, drop_last_batch = False)):
+        batch_embeddings = (
+            sbert_model
+            .encode(
+                batch["resumes.fr"], 
+                device=str(device), 
+                normalize_embeddings=True, 
+                show_progress_bar=False
+            )
         )
-    )
-    ds = ds.add_column(
-        "embedding", 
-        [
-            embeddings[i,:].reshape(-1,) 
-            for i in range(embeddings.shape[0])
+        embeddings += [
+            batch_embeddings[i,:].reshape(-1,) 
+            for i in range(batch_embeddings.shape[0])
         ]
-    )
-    ds.save_to_disk("temp-test")
+    ds = ds.add_column("embedding", embeddings)
+    ds.save_to_disk(f"./embeddings/{model_name.split('/')[-1]}-{language}-SBERT")
 except Exception as e:
     print(e)
 finally:
