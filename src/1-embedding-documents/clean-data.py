@@ -9,10 +9,11 @@ Steps :
     - retrieve all entries where the languages match.
     - add a custom index
 """
+from time import time
 from fast_langdetect import detect_language as detect
 import numpy as np
 import pandas as pd
-from typing import Any
+pd.options.mode.copy_on_write = True  
 
 columns = [
     "date_soutenance",
@@ -94,13 +95,14 @@ columns = [
     "sujets_rameau.8",
     "sujets_rameau.9",
 ]
-df = pd.read_csv("theses-soutenues.csv", usecols=columns)
-print(f"# df loaded (nrows = {len(df)})")
+start = time()
+df_raw = pd.read_csv("./data/theses-soutenues.csv", usecols=columns)
+print(f"# df loaded (nrows = {len(df_raw)} - {time()-start:.0f} s)")
 
-
-def first_oai(oai_code: str):
-    try:
-        return oai_code.split("||")[0]
+# First select rows to reduce the size of the dataframe ========================
+def get_year(date : str):
+    try : 
+        return pd.Timestamp(date).year
     except Exception:
         return np.nan
 
@@ -121,29 +123,10 @@ print((f"# only keep thesis published between 2010 and 2022 and inputs where"
        f"(nrows = {len(df)};"
        f" {100 * len(df)/len(df_raw):.0f} % - {time()-start:.0f} s)"))
 
-df["oai_first"] = df["oai_set_specs"].apply(first_oai)
-
-oai_reference = pd.read_csv("code.csv")
-
-
-def retrieve_oai_name(oai_code: str):
-    index = oai_reference["code"] == oai_code
-    try:
-        return oai_reference.loc[index, "name"].item()
-    except Exception:
-        return np.nan
-
-
-df["oai_first_name"] = df["oai_first"].apply(retrieve_oai_name)
-print(
-    f"# OAI codes retrieved (retrieve rate : {int((~df["oai_first_name"].isna()).mean() * 100):.0f} %)"
-)
-
-
-def aggregate_sujets_rameau(row: dict[str:Any]):
+# Aggregation of topics and language checking ==================================
+def aggregate_sujets_rameau(row: dict[str]):
     sujets_en = []
     sujets_fr = []
-
     for col_name in row.index:
         if col_name.startswith("sujets_rameau"):
             if isinstance(row[col_name], str):
@@ -152,85 +135,89 @@ def aggregate_sujets_rameau(row: dict[str:Any]):
                     sujets_fr += [row[col_name]]
                 elif language == "EN":
                     sujets_en += [row[col_name]]
-    row["sujets_rameau_fr"] = "||".join(sujets_fr)
-    row["sujets_rameau_en"] = "||".join(sujets_en)
+    row["topics.fr"] = "||".join(sujets_fr)
+    row["topics.en"] = "||".join(sujets_en)
     return row
 
-
+start = time()
 df = df.apply(aggregate_sujets_rameau, axis=1)
-
-print("# sujets-rameaux aggregés")
+print(f"# Aggregation of the topics ({time() - start:.0f} s)")
 
 cols = [
-    "date_soutenance",
-    "discipline",
+    "year",
     "oai_set_specs",
-    "oai_first",
-    "oai_first_name",
-    "resumes.en",
-    "resumes.fr",
+
     "titres.en",
+    "resumes.en",
+    "topics.en",
+    
     "titres.fr",
-    "sujets_rameau_fr",
-    "sujets_rameau_en",
+    "resumes.fr",
+    "topics.fr",
 ]
 df = df.loc[:, cols]
 
 
 def check_language_resumes(row: dict):
+    row["lang_res.en"] = np.nan
+    row["lang_res.fr"] = np.nan
+    # check language for english column
     if isinstance(row["resumes.en"], str):
-        row["lang_res_en"] = detect(row["resumes.en"])
-    else:
-        row["lang_res_en"] = np.nan
-
+        if len(row["resumes.en"]) > 0:
+            row["lang_res.en"] = detect(row["resumes.en"])
+    # check language for french column
     if isinstance(row["resumes.fr"], str):
-        row["lang_res_fr"] = detect(row["resumes.fr"])
-    else:
-        row["lang_res_fr"] = np.nan
+        if len(row["resumes.fr"]) > 0:
+            row["lang_res.fr"] = detect(row["resumes.fr"])
 
     return row
 
 
+start = time()
 df = df.apply(check_language_resumes, axis=1)
-
-print("# resumes' language checked")
-
+print(f"# resumes' language checked ({time() - start:.0f} s)")
 
 def swap_languages(row: dict):
-    if (row["lang_res_en"] == "FR") and (row["lang_res_fr"] == "EN"):
-        cache = row["resumes.en"]
-        row["resumes.en"] = row["resumes.fr"]
-        row["resumes.fr"] = cache
-        row["lang_res_fr"] = "FR"
-        row["lang_res_en"] = "EN"
-        row["swapped"] = True
+    row_copy = row.copy()
+    if (row["lang_res.en"] == "FR") and (row["lang_res.fr"] == "EN"):
+        row_copy["resumes.en"] = row["resumes.fr"]
+        row_copy["resumes.fr"] = row["resumes.en"]
+        row_copy["lang_res.fr"] = "FR"
+        row_copy["lang_res.en"] = "EN"
+        row_copy["swapped"] = True
+    return row_copy
 
-    return row
-
-
+start = time()
 df = df.apply(swap_languages, axis=1)
+print(f"# resumes swapped ({time() - start:.0f} s)")
 
-print("# resumes swapped")
-
-rows_to_keep = (df["lang_res_en"] == "EN") & (df["lang_res_fr"] == "FR")
+# Save file as parquet ==========================================================
+rows_to_keep = np.logical_and(
+    (df["lang_res.en"] == "EN"),
+    (df["lang_res.fr"] == "FR")
+)
 cols_to_keep = [
-    "date_soutenance",
-    "discipline",
-    "oai_first",
-    "oai_first_name" "resumes.en",
-    "resumes.fr",
+    "year",
+    "oai_set_specs",
+    
     "titres.en",
+    "resumes.en",
+    "lang_res.en",
+    "topics.en",
+    
     "titres.fr",
-    "sujets_rameau_fr",
-    "sujets_rameau_en",
-    "lang_res_en",
-    "lang_res_fr",
+    "resumes.fr",
+    "lang_res.fr",
+    "topics.fr",
+    
     "swapped",
 ]
-dfp = df.loc[rows_to_keep, :]
+df_final = df.loc[rows_to_keep, cols_to_keep]
 
-dfp["CI"] = [f"CI-{i}" for i in range(len(dfp))]
+# Create a custom index
+df_final.insert(0,"CI",[f"CI-{i}" for i in range(len(df_final))])
 
-dfp.to_csv("theses-soutenues-clean-with-index.csv", index=False)
-
-print(f"file saved (nrows = {len(dfp)}; {int(100 * len(dfp)/len(df))} %)")
+df_final.to_csv("./data/theses-soutenues-clean-with-index.csv", index=False)
+df_final.to_parquet("./data/theses-soutenues-clean-with-index.parquet", index=False)
+print((f"# file saved (nrows = {len(df_final)}; "
+       f"{int(100 * len(df_final)/len(df))} %)"))
