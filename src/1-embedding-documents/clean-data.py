@@ -104,6 +104,22 @@ def first_oai(oai_code: str):
     except Exception:
         return np.nan
 
+start = time()
+df_raw.loc[:,"year"] = df_raw.loc[:,"date_soutenance"].apply(get_year)
+# Select thesis published between 2010 and 2022
+def is_string(el): return isinstance(el, str)
+years_to_keep = np.logical_and.reduce([
+    df_raw["year"] >= 2010, 
+    df_raw["year"] <= 2022,
+    df_raw["oai_set_specs"].apply(is_string),   
+    df_raw["resumes.en"].apply(is_string),   
+    df_raw["resumes.fr"].apply(is_string),   
+])
+df = df_raw.loc[years_to_keep, :]
+print((f"# only keep thesis published between 2010 and 2022 and inputs where"
+       f" the oai_set_specs and resumes are the right type (string) "
+       f"(nrows = {len(df)};"
+       f" {100 * len(df)/len(df_raw):.0f} % - {time()-start:.0f} s)"))
 
 df["oai_first"] = df["oai_set_specs"].apply(first_oai)
 
