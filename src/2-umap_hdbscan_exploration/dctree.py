@@ -297,11 +297,11 @@ class DCTree:
         pointer_right = "   "
         pointer_left = "   " if node.right else "   "
         return (
-            f"\n   {padding.replace("|", " ")}// #region"
+            f"\n   {padding.replace('|', ' ')}// #region"
             f"\n{padding}{pointer}{node}"
             f"{self.__repr__help(node.left, pointer_left, padding_for_both, node.right is not None)}"
             f"{self.__repr__help(node.right, pointer_right, padding_for_both, False)}"
-            f"\n   {padding.replace("|", " ")}// #endregion"
+            f"\n   {padding.replace('|', ' ')}// #endregion"
         )
 
     def dc_dist(self, i: int, j: int) -> float:
