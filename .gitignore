@@ -5,3 +5,4 @@ embeddings/*
 !embeddings/README.md
 **/logs.txt
 **/temp-*
+__pycache__
