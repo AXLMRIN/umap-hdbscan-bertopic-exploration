@@ -1,3 +1,14 @@
+"""
+Data cleaning of theses-soutenues.csv (in folder data). 
+Steps : 
+    - select thesis published between 2010 and 2022, remove all rows where the 
+      oai_set_specs, resumes.fr and resumes.en are NOT strings
+    - aggregate the topics (topics.fr and topics.en)
+    - make sure the resumes provided are written in the right language, if both
+      resumes are provided but inserted in the wrong column, swap the values  
+    - retrieve all entries where the languages match.
+    - add a custom index
+"""
 from fast_langdetect import detect_language as detect
 import numpy as np
 import pandas as pd
